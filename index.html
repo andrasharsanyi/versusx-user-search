@@ -79,12 +79,28 @@
             padding: 20px;
             color: #666;
         }
-        .error {
-            background: #ffeaa7;
-            color: #d63031;
+        .success {
+            background: #dff0d8;
+            color: #3c763d;
             padding: 15px;
             border-radius: 4px;
             margin: 10px 0;
+        }
+        .success {
+            background: #dff0d8;
+            color: #3c763d;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .debug-info {
+            background: #e8f4f8;
+            color: #31708f;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
         }
     </style>
 </head>
@@ -99,19 +115,41 @@
     <div id="results"></div>
 
     <script>
-        // Firebase Configuration - REPLACE WITH YOUR CONFIG
+        // VersusX Firebase Configuration - Updated with your actual config
         const firebaseConfig = {
-            apiKey: "YOUR_FIREBASE_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com", 
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyCbHhwS7kjq3s-zidpdk0THPugYTyzSqhI",
+            authDomain: "eskillz-pool.firebaseapp.com",
+            databaseURL: "https://eskillz-pool-default-rtdb.firebaseio.com",
+            projectId: "eskillz-pool",
+            storageBucket: "eskillz-pool.appspot.com",
+            messagingSenderId: "285834418480",
+            appId: "1:285834418480:web:86863685fac50c99e950f5",
+            measurementId: "G-7C45NW1VCC"
         };
 
         // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            
+            // Enable offline persistence
+            db.enablePersistence()
+                .catch((err) => {
+                    console.log('Persistence failed:', err);
+                    if (err.code == 'failed-precondition') {
+                        console.log('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+                    } else if (err.code == 'unimplemented') {
+                        console.log('Browser doesn\'t support persistence');
+                    }
+                });
+            
+            console.log('Firebase initialized successfully');
+            document.getElementById('results').innerHTML = '<div class="success">Firebase connected successfully! Ready to search.</div>';
+        } catch (error) {
+            console.error('Firebase initialization error:', error);
+            document.getElementById('results').innerHTML = `<div class="error">Firebase initialization failed: ${error.message}</div>`;
+        }
 
         async function searchUsers() {
             const searchTerm = document.getElementById('searchInput').value.trim();
@@ -123,6 +161,7 @@
             }
 
             resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+            console.log('Starting search for:', searchTerm);
 
             try {
                 let results = [];
@@ -147,7 +186,15 @@
                                 data: profileDoc.data()
                             });
                         } else {
-                            console.log('ProfileData document not found');
+                            console.log('ProfileData document not found, checking user doc data');
+                            // If ProfileData doesn't exist, check if user doc itself has the data
+                            const userData = userDoc.data();
+                            if (userData && Object.keys(userData).length > 0) {
+                                results.push({
+                                    id: userDoc.id,
+                                    data: userData
+                                });
+                            }
                         }
                     } else {
                         console.log('User document not found');
@@ -156,70 +203,129 @@
                     console.log('Direct ID search failed:', e);
                 }
 
-                // Search all users' ProfileData for matching fields
+                // If no results by exact ID, search through all users
                 if (results.length === 0) {
-                    const usersSnapshot = await db.collection('users').get();
+                    console.log('No direct match found, searching all users...');
+                    resultsDiv.innerHTML = '<div class="loading">Searching through all users... This may take a moment.</div>';
                     
+                    const usersSnapshot = await db.collection('users').limit(100).get(); // Limit to prevent timeout
+                    console.log('Found', usersSnapshot.docs.length, 'user documents');
+                    
+                    let searchedCount = 0;
                     for (const userDoc of usersSnapshot.docs) {
                         try {
-                            const profileDoc = await userDoc.ref.collection('Profile').doc('ProfileData').get();
+                            searchedCount++;
                             
-                            if (profileDoc.exists) {
-                                const data = profileDoc.data();
+                            // First check the main user document
+                            let data = userDoc.data();
+                            let foundInMain = false;
+                            
+                            if (data && checkDataMatch(data, searchTerm)) {
+                                results.push({
+                                    id: userDoc.id,
+                                    data: data,
+                                    source: 'main_doc'
+                                });
+                                foundInMain = true;
+                            }
+                            
+                            // Then check the Profile subcollection
+                            if (!foundInMain) {
+                                const profileDoc = await userDoc.ref.collection('Profile').doc('ProfileData').get();
                                 
-                                // Check if search term matches any field
-                                const searchLower = searchTerm.toLowerCase();
-                                if (
-                                    (data.userName && data.userName.toLowerCase().includes(searchLower)) ||
-                                    (data.userid && data.userid.toLowerCase().includes(searchLower)) ||
-                                    (data.eSkillzWalletAddress && data.eSkillzWalletAddress.toLowerCase().includes(searchLower)) ||
-                                    (data.eSkillzKey && data.eSkillzKey.toLowerCase().includes(searchLower))
-                                ) {
-                                    results.push({
-                                        id: userDoc.id,
-                                        data: data
-                                    });
+                                if (profileDoc.exists) {
+                                    data = profileDoc.data();
+                                    
+                                    if (checkDataMatch(data, searchTerm)) {
+                                        results.push({
+                                            id: userDoc.id,
+                                            data: data,
+                                            source: 'profile_doc'
+                                        });
+                                    }
                                 }
                             }
+                            
+                            // Update progress every 10 searches
+                            if (searchedCount % 10 === 0) {
+                                resultsDiv.innerHTML = `<div class="loading">Searched ${searchedCount} users... Found ${results.length} matches so far.</div>`;
+                            }
+                            
                         } catch (e) {
                             console.log('Error searching user:', userDoc.id, e);
                         }
                     }
+                    
+                    console.log('Search completed. Found', results.length, 'results');
                 }
 
-                displayResults(results);
+                displayResults(results, searchTerm);
 
             } catch (error) {
                 console.error('Search error:', error);
-                resultsDiv.innerHTML = `<div class="error">Search failed: ${error.message}</div>`;
+                resultsDiv.innerHTML = `<div class="error">Search failed: ${error.message}<br><br>
+                    <div class="debug-info">
+                        Error details: ${error.code ? error.code : 'Unknown error'}<br>
+                        Make sure you're connected to the internet and Firebase is properly configured.
+                    </div>
+                </div>`;
             }
         }
 
-        function displayResults(results) {
+        function checkDataMatch(data, searchTerm) {
+            const searchLower = searchTerm.toLowerCase();
+            
+            // List of fields to search through
+            const fieldsToSearch = [
+                'userName', 'userid', 'eSkillzWalletAddress', 'eSkillzKey', 
+                'email', 'displayName', 'walletAddress', 'address'
+            ];
+            
+            for (const field of fieldsToSearch) {
+                if (data[field] && data[field].toString().toLowerCase().includes(searchLower)) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        function displayResults(results, searchTerm) {
             const resultsDiv = document.getElementById('results');
             
             if (results.length === 0) {
-                resultsDiv.innerHTML = '<div class="no-results">No users found matching your search.</div>';
+                resultsDiv.innerHTML = `
+                    <div class="no-results">
+                        No users found matching "${searchTerm}".
+                        <div class="debug-info">
+                            Search was performed on fields: userName, userid, eSkillzWalletAddress, eSkillzKey, email, displayName, walletAddress, address
+                        </div>
+                    </div>`;
                 return;
             }
 
-            let html = '';
+            let html = `<div class="success">Found ${results.length} user(s) matching "${searchTerm}"</div>`;
+            
             results.forEach(result => {
                 const data = result.data;
                 html += `
                     <div class="result">
-                        <div class="user-id">User ID: ${result.id}</div>
+                        <div class="user-id">User ID: ${result.id} ${result.source ? `(from ${result.source})` : ''}</div>
                         <div class="user-details">
-                            <div class="field"><span class="field-name">Username:</span> ${data.userName || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Username:</span> ${data.userName || data.displayName || 'N/A'}</div>
+                            <div class="field"><span class="field-name">User ID (from data):</span> ${data.userid || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Email:</span> ${data.email || 'N/A'}</div>
                             <div class="field"><span class="field-name">Player Level:</span> ${data.PlayerLevel || 'N/A'}</div>
                             <div class="field"><span class="field-name">Player XP:</span> ${data.PlayerXP || 'N/A'}</div>
                             <div class="field"><span class="field-name">Skill Points:</span> ${data.SkillPoints || 'N/A'}</div>
                             <div class="field"><span class="field-name">Games Played:</span> ${data.gamesplayed || 'N/A'}</div>
                             <div class="field"><span class="field-name">Wins:</span> ${data.Wins || 'N/A'}</div>
                             <div class="field"><span class="field-name">Losses:</span> ${data.lost || 'N/A'}</div>
-                            <div class="field"><span class="field-name">Wallet Address:</span> ${data.eSkillzWalletAddress || 'N/A'}</div>
-                            <div class="field"><span class="field-name">Last Played:</span> ${data.LastPlayed ? new Date(data.LastPlayed.seconds * 1000).toLocaleString() : 'N/A'}</div>
+                            <div class="field"><span class="field-name">Wallet Address:</span> ${data.eSkillzWalletAddress || data.walletAddress || data.address || 'N/A'}</div>
+                            <div class="field"><span class="field-name">eSkillz Key:</span> ${data.eSkillzKey || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Last Played:</span> ${data.LastPlayed ? (data.LastPlayed.seconds ? new Date(data.LastPlayed.seconds * 1000).toLocaleString() : data.LastPlayed) : 'N/A'}</div>
                             <div class="field"><span class="field-name">Birth Day:</span> ${data.birthDay || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Created:</span> ${data.createTime ? (data.createTime.seconds ? new Date(data.createTime.seconds * 1000).toLocaleString() : data.createTime) : 'N/A'}</div>
                         </div>
                     </div>
                 `;
@@ -233,6 +339,38 @@
             if (e.key === 'Enter') {
                 searchUsers();
             }
+        });
+
+        // Test Firebase connection on page load
+        window.addEventListener('load', function() {
+            document.getElementById('results').innerHTML = '<div class="loading">Testing Firebase connection...</div>';
+            
+            setTimeout(async function() {
+                try {
+                    // Try to read from Firestore to test connection
+                    const testDoc = await db.collection('users').limit(1).get();
+                    console.log('Firebase connection test successful, found', testDoc.docs.length, 'user(s)');
+                    document.getElementById('results').innerHTML = '<div class="success">Firebase connected successfully! Ready to search users.</div>';
+                } catch (error) {
+                    console.error('Firebase connection test failed:', error);
+                    document.getElementById('results').innerHTML = `<div class="error">Firebase connection test failed: ${error.message}<br><br>Project ID: ${firebaseConfig.projectId}</div>`;
+                }
+            }, 2000);
+        });
+
+        // Test Firebase connection on page load
+        window.addEventListener('load', function() {
+            setTimeout(async function() {
+                try {
+                    // Try to read from Firestore to test connection
+                    const testDoc = await db.collection('users').limit(1).get();
+                    console.log('Firebase connection test successful');
+                    document.getElementById('results').innerHTML = '<div class="success">Firebase connected and ready! You can now search for users.</div>';
+                } catch (error) {
+                    console.error('Firebase connection test failed:', error);
+                    document.getElementById('results').innerHTML = `<div class="error">Firebase connection test failed: ${error.message}</div>`;
+                }
+            }, 2000);
         });
     </script>
 </body>
