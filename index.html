@@ -388,15 +388,42 @@
             setTimeout(async function() {
                 try {
                     // Try to read from Firestore to test connection
-                    const testDoc = await db.collection('users').limit(1).get();
+                    const testDoc = await db.collection('users').limit(5).get();
                     console.log('Firebase connection test successful, found', testDoc.docs.length, 'user(s)');
                     
-                    if (testDoc.docs.length > 0) {
-                        console.log('Sample user ID:', testDoc.docs[0].id);
-                        console.log('Sample user data:', testDoc.docs[0].data());
+                    let sampleUsersWithProfiles = [];
+                    
+                    for (const userDoc of testDoc.docs) {
+                        console.log('Checking user:', userDoc.id);
+                        
+                        try {
+                            const profileDoc = await userDoc.ref.collection('Profile').doc('ProfileData').get();
+                            if (profileDoc.exists) {
+                                const profileData = profileDoc.data();
+                                sampleUsersWithProfiles.push({
+                                    id: userDoc.id,
+                                    userName: profileData.userName,
+                                    userid: profileData.userid
+                                });
+                                console.log('✓ User with profile found:', userDoc.id, '- userName:', profileData.userName);
+                            } else {
+                                console.log('✗ No profile for user:', userDoc.id);
+                            }
+                        } catch (e) {
+                            console.log('Error checking profile for', userDoc.id, ':', e);
+                        }
                     }
                     
-                    document.getElementById('results').innerHTML = '<div class="success">Firebase connected successfully! Ready to search users.</div>';
+                    let message = `Firebase connected successfully! Found ${sampleUsersWithProfiles.length} users with profiles out of ${testDoc.docs.length} checked.`;
+                    
+                    if (sampleUsersWithProfiles.length > 0) {
+                        message += '<br><br><strong>Sample users you can search for:</strong><br>';
+                        sampleUsersWithProfiles.forEach(user => {
+                            message += `• User ID: <code>${user.id}</code> (userName: "${user.userName}")<br>`;
+                        });
+                    }
+                    
+                    document.getElementById('results').innerHTML = `<div class="success">${message}</div>`;
                 } catch (error) {
                     console.error('Firebase connection test failed:', error);
                     document.getElementById('results').innerHTML = `<div class="error">Firebase connection test failed: ${error.message}<br><br>Project ID: ${firebaseConfig.projectId}</div>`;
