@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VersusX User Search</title>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .search-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .search-input {
+            width: 70%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .search-btn {
+            padding: 12px 24px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+        .search-btn:hover {
+            background: #3367d6;
+        }
+        .result {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #4285f4;
+        }
+        .user-id {
+            font-weight: bold;
+            color: #1a73e8;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .user-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .field {
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .field-name {
+            font-weight: bold;
+            color: #5f6368;
+        }
+        .no-results {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .error {
+            background: #ffeaa7;
+            color: #d63031;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>VersusX User Search</h1>
+    
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search by User ID, Username, or Wallet Address..." />
+        <button onclick="searchUsers()" class="search-btn">Search</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        // Firebase Configuration - REPLACE WITH YOUR CONFIG
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+            apiKey: "AIzaSyCbHhwS7kjq3s-zidpdk0THPugYTyzSqhI",
+            authDomain: "eskillz-pool.firebaseapp.com",
+            databaseURL: "https://eskillz-pool-default-rtdb.firebaseio.com",
+            projectId: "eskillz-pool",
+            storageBucket: "eskillz-pool.appspot.com",
+            messagingSenderId: "285834418480",
+            appId: "1:285834418480:web:86863685fac50c99e950f5",
+            measurementId: "G-7C45NW1VCC"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        async function searchUsers() {
+            const searchTerm = document.getElementById('searchInput').value.trim();
+            const resultsDiv = document.getElementById('results');
+            
+            if (!searchTerm) {
+                resultsDiv.innerHTML = '<div class="error">Please enter a search term</div>';
+                return;
+            }
+
+            resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+
+            try {
+                let results = [];
+
+                // Search by exact User ID (document ID)
+                try {
+                    const userDocRef = db.collection('users').doc(searchTerm);
+                    const userDoc = await userDocRef.get();
+                    
+                    if (userDoc.exists) {
+                        const profileDoc = await userDocRef.collection('Profile').doc('ProfileData').get();
+                        if (profileDoc.exists) {
+                            results.push({
+                                id: userDoc.id,
+                                data: profileDoc.data()
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.log('Direct ID search failed:', e);
+                }
+
+                // Search all users' ProfileData for matching fields
+                if (results.length === 0) {
+                    const usersSnapshot = await db.collection('users').get();
+                    
+                    for (const userDoc of usersSnapshot.docs) {
+                        try {
+                            const profileDoc = await userDoc.ref.collection('Profile').doc('ProfileData').get();
+                            
+                            if (profileDoc.exists) {
+                                const data = profileDoc.data();
+                                
+                                // Check if search term matches any field
+                                const searchLower = searchTerm.toLowerCase();
+                                if (
+                                    (data.userName && data.userName.toLowerCase().includes(searchLower)) ||
+                                    (data.userid && data.userid.toLowerCase().includes(searchLower)) ||
+                                    (data.eSkillzWalletAddress && data.eSkillzWalletAddress.toLowerCase().includes(searchLower)) ||
+                                    (data.eSkillzKey && data.eSkillzKey.toLowerCase().includes(searchLower))
+                                ) {
+                                    results.push({
+                                        id: userDoc.id,
+                                        data: data
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            console.log('Error searching user:', userDoc.id, e);
+                        }
+                    }
+                }
+
+                displayResults(results);
+
+            } catch (error) {
+                console.error('Search error:', error);
+                resultsDiv.innerHTML = `<div class="error">Search failed: ${error.message}</div>`;
+            }
+        }
+
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div class="no-results">No users found matching your search.</div>';
+                return;
+            }
+
+            let html = '';
+            results.forEach(result => {
+                const data = result.data;
+                html += `
+                    <div class="result">
+                        <div class="user-id">User ID: ${result.id}</div>
+                        <div class="user-details">
+                            <div class="field"><span class="field-name">Username:</span> ${data.userName || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Player Level:</span> ${data.PlayerLevel || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Player XP:</span> ${data.PlayerXP || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Skill Points:</span> ${data.SkillPoints || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Games Played:</span> ${data.gamesplayed || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Wins:</span> ${data.Wins || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Losses:</span> ${data.lost || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Wallet Address:</span> ${data.eSkillzWalletAddress || 'N/A'}</div>
+                            <div class="field"><span class="field-name">Last Played:</span> ${data.LastPlayed ? new Date(data.LastPlayed.seconds * 1000).toLocaleString() : 'N/A'}</div>
+                            <div class="field"><span class="field-name">Birth Day:</span> ${data.birthDay || 'N/A'}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        // Allow Enter key to search
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchUsers();
+            }
+        });
+    </script>
+</body>
+</html>
