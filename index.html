@@ -12,6 +12,43 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
+
+        // Function to switch to alternative Firebase project
+        function switchToDevProject() {
+            const devConfig = {
+                apiKey: "AIzaSyA7Hzz4bJhGbNmCaiMpTKVYfAMsBTXUekE",
+                authDomain: "devtesting-5c10c.firebaseapp.com",
+                projectId: "devtesting-5c10c",
+                storageBucket: "devtesting-5c10c.appspot.com",
+                messagingSenderId: "847604839486",
+                appId: "1:847604839486:web:8ee03136117cc5a2c10d6f",
+                measurementId: "G-5CXBXXJ0TT"
+            };
+
+            try {
+                // Delete the current app and reinitialize with dev config
+                firebase.app().delete().then(() => {
+                    firebase.initializeApp(devConfig);
+                    db = firebase.firestore();
+                    console.log('Switched to dev project:', devConfig.projectId);
+                    document.getElementById('results').innerHTML = '<div class="success">Switched to dev project. Testing connection...</div>';
+                    
+                    setTimeout(async function() {
+                        try {
+                            const testDoc = await db.collection('users').limit(1).get();
+                            console.log('Dev project connection successful, found', testDoc.docs.length, 'user(s)');
+                            document.getElementById('results').innerHTML = '<div class="success">Dev project connected! Ready to search.</div>';
+                        } catch (error) {
+                            console.error('Dev project connection failed:', error);
+                            document.getElementById('results').innerHTML = `<div class="error">Dev project connection failed: ${error.message}</div>`;
+                        }
+                    }, 1000);
+                });
+            } catch (error) {
+                console.error('Error switching projects:', error);
+                document.getElementById('results').innerHTML = `<div class="error">Error switching projects: ${error.message}</div>`;
+            }
+        }
         .search-container {
             background: white;
             padding: 20px;
@@ -110,6 +147,9 @@
     <div class="search-container">
         <input type="text" id="searchInput" class="search-input" placeholder="Search by User ID, Username, or Wallet Address..." />
         <button onclick="searchUsers()" class="search-btn">Search</button>
+        <br><br>
+        <small>Alternative Firebase Project (if main doesn't work):</small>
+        <button onclick="switchToDevProject()" style="padding: 8px 16px; background: #ff6b6b; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">Try Dev Project</button>
     </div>
 
     <div id="results"></div>
@@ -350,6 +390,12 @@
                     // Try to read from Firestore to test connection
                     const testDoc = await db.collection('users').limit(1).get();
                     console.log('Firebase connection test successful, found', testDoc.docs.length, 'user(s)');
+                    
+                    if (testDoc.docs.length > 0) {
+                        console.log('Sample user ID:', testDoc.docs[0].id);
+                        console.log('Sample user data:', testDoc.docs[0].data());
+                    }
+                    
                     document.getElementById('results').innerHTML = '<div class="success">Firebase connected successfully! Ready to search users.</div>';
                 } catch (error) {
                     console.error('Firebase connection test failed:', error);
