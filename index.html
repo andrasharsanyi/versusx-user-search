@@ -100,16 +100,13 @@
 
     <script>
         // Firebase Configuration - REPLACE WITH YOUR CONFIG
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
-            apiKey: "AIzaSyCbHhwS7kjq3s-zidpdk0THPugYTyzSqhI",
-            authDomain: "eskillz-pool.firebaseapp.com",
-            databaseURL: "https://eskillz-pool-default-rtdb.firebaseio.com",
-            projectId: "eskillz-pool",
-            storageBucket: "eskillz-pool.appspot.com",
-            messagingSenderId: "285834418480",
-            appId: "1:285834418480:web:86863685fac50c99e950f5",
-            measurementId: "G-7C45NW1VCC"
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com", 
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
 
         // Initialize Firebase
@@ -132,17 +129,28 @@
 
                 // Search by exact User ID (document ID)
                 try {
+                    console.log('Searching for user ID:', searchTerm);
                     const userDocRef = db.collection('users').doc(searchTerm);
                     const userDoc = await userDocRef.get();
                     
+                    console.log('User doc exists:', userDoc.exists);
                     if (userDoc.exists) {
+                        console.log('User doc data:', userDoc.data());
+                        
                         const profileDoc = await userDocRef.collection('Profile').doc('ProfileData').get();
+                        console.log('Profile doc exists:', profileDoc.exists);
+                        
                         if (profileDoc.exists) {
+                            console.log('Profile doc data:', profileDoc.data());
                             results.push({
                                 id: userDoc.id,
                                 data: profileDoc.data()
                             });
+                        } else {
+                            console.log('ProfileData document not found');
                         }
+                    } else {
+                        console.log('User document not found');
                     }
                 } catch (e) {
                     console.log('Direct ID search failed:', e);
