@@ -3,7 +3,7 @@
 <head>
     <title>VersusX User Search</title>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -11,66 +11,6 @@
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
-        }
-
-        // Function to switch to alternative Firebase project
-        function switchToDevProject() {
-            const devConfig = {
-                apiKey: "AIzaSyA7Hzz4bJhGbNmCaiMpTKVYfAMsBTXUekE",
-                authDomain: "devtesting-5c10c.firebaseapp.com",
-                projectId: "devtesting-5c10c",
-                storageBucket: "devtesting-5c10c.appspot.com",
-                messagingSenderId: "847604839486",
-                appId: "1:847604839486:web:8ee03136117cc5a2c10d6f",
-                measurementId: "G-5CXBXXJ0TT"
-            };
-
-            document.getElementById('results').innerHTML = '<div class="loading">Switching to dev project...</div>';
-
-            try {
-                // Delete the current app and reinitialize with dev config
-                firebase.app().delete().then(async () => {
-                    firebase.initializeApp(devConfig);
-                    db = firebase.firestore();
-                    console.log('=== SWITCHED TO DEV PROJECT ===');
-                    console.log('New project ID:', devConfig.projectId);
-                    
-                    document.getElementById('results').innerHTML = '<div class="loading">Testing dev project connection...</div>';
-                    
-                    try {
-                        const testSnapshot = await db.collection('users').get();
-                        const totalUsers = testSnapshot.docs.length;
-                        console.log('DEV PROJECT - Total users found:', totalUsers);
-                        
-                        if (totalUsers > 100) {
-                            document.getElementById('results').innerHTML = `
-                                <div class="success">
-                                    <strong>🎉 SUCCESS!</strong> Switched to dev project: <strong>${devConfig.projectId}</strong><br>
-                                    Found <strong>${totalUsers}</strong> users in this project!<br><br>
-                                    This looks like the correct project with your user data.<br>
-                                    <strong>You can now search for users!</strong>
-                                </div>`;
-                        } else {
-                            document.getElementById('results').innerHTML = `
-                                <div class="error">
-                                    Dev project connected but only found ${totalUsers} users.<br>
-                                    Project: <strong>${devConfig.projectId}</strong><br><br>
-                                    You may need to check which Firebase project contains your user data.
-                                </div>`;
-                        }
-                    } catch (error) {
-                        console.error('Dev project connection failed:', error);
-                        document.getElementById('results').innerHTML = `
-                            <div class="error">
-                                Dev project connection failed: ${error.message}<br>
-                                Project: <strong>${devConfig.projectId}</strong>
-                            </div>`;
-                    }
-                });
-            } catch (error) {
-                console.error('Error switching projects:', error);
-                document.getElementById('results').innerHTML = `<div class="error">Error switching projects: ${error.message}</div>`;
-            }
         }
         .search-container {
             background: white;
@@ -139,9 +79,9 @@
             padding: 20px;
             color: #666;
         }
-        .success {
-            background: #dff0d8;
-            color: #3c763d;
+        .error {
+            background: #ffeaa7;
+            color: #d63031;
             padding: 15px;
             border-radius: 4px;
             margin: 10px 0;
@@ -152,38 +92,26 @@
             padding: 15px;
             border-radius: 4px;
             margin: 10px 0;
-        }
-        .debug-info {
-            background: #e8f4f8;
-            color: #31708f;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-            font-family: monospace;
-            font-size: 12px;
         }
     </style>
 </head>
 <body>
-    <h1>VersusX User Search</h1>
+    <h1>VersusX User Search (Realtime Database)</h1>
     
     <div class="search-container">
         <input type="text" id="searchInput" class="search-input" placeholder="Search by User ID, Username, or Wallet Address..." />
         <button onclick="searchUsers()" class="search-btn">Search</button>
         <br><br>
-        <div style="padding: 15px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; margin-top: 10px;">
-            <strong>⚠️ WRONG PROJECT?</strong> If you only see 1 user in your database, click here to try the development project:
-            <br><br>
-            <button onclick="switchToDevProject()" style="padding: 12px 24px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                🔄 Switch to Dev Project (devtesting-5c10c)
-            </button>
+        <div style="padding: 15px; background: #e8f4fd; border: 1px solid #bee5eb; border-radius: 4px; margin-top: 10px;">
+            <strong>🔍 Now searching Firebase Realtime Database!</strong><br>
+            This tool now searches your actual user data in Firebase Realtime Database instead of Firestore.
         </div>
     </div>
 
     <div id="results"></div>
 
     <script>
-        // VersusX Firebase Configuration - Updated with your actual config
+        // VersusX Firebase Configuration for Realtime Database
         const firebaseConfig = {
             apiKey: "AIzaSyCbHhwS7kjq3s-zidpdk0THPugYTyzSqhI",
             authDomain: "eskillz-pool.firebaseapp.com",
@@ -195,25 +123,12 @@
             measurementId: "G-7C45NW1VCC"
         };
 
-        // Initialize Firebase
-        let db;
+        // Initialize Firebase with Realtime Database
+        let database;
         try {
             firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            
-            // Enable offline persistence
-            db.enablePersistence()
-                .catch((err) => {
-                    console.log('Persistence failed:', err);
-                    if (err.code == 'failed-precondition') {
-                        console.log('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-                    } else if (err.code == 'unimplemented') {
-                        console.log('Browser doesn\'t support persistence');
-                    }
-                });
-            
-            console.log('Firebase initialized successfully');
-            document.getElementById('results').innerHTML = '<div class="success">Firebase connected successfully! Ready to search.</div>';
+            database = firebase.database();
+            console.log('Firebase Realtime Database initialized successfully');
         } catch (error) {
             console.error('Firebase initialization error:', error);
             document.getElementById('results').innerHTML = `<div class="error">Firebase initialization failed: ${error.message}</div>`;
@@ -228,103 +143,108 @@
                 return;
             }
 
-            resultsDiv.innerHTML = '<div class="loading">Searching...</div>';
+            resultsDiv.innerHTML = '<div class="loading">Searching Realtime Database...</div>';
             console.log('Starting search for:', searchTerm);
 
             try {
                 let results = [];
 
-                // Search by exact User ID (document ID)
-                try {
-                    console.log('Searching for user ID:', searchTerm);
-                    const userDocRef = db.collection('users').doc(searchTerm);
-                    const userDoc = await userDocRef.get();
+                // First try direct user ID lookup
+                console.log('Trying direct user lookup for:', searchTerm);
+                
+                const userSnapshot = await database.ref(`users/${searchTerm}`).once('value');
+                if (userSnapshot.exists()) {
+                    const userData = userSnapshot.val();
+                    console.log('Direct user found:', userData);
                     
-                    console.log('User doc exists:', userDoc.exists);
-                    if (userDoc.exists) {
-                        console.log('User doc data:', userDoc.data());
-                        
-                        const profileDoc = await userDocRef.collection('Profile').doc('ProfileData').get();
-                        console.log('Profile doc exists:', profileDoc.exists);
-                        
-                        if (profileDoc.exists) {
-                            console.log('Profile doc data:', profileDoc.data());
-                            results.push({
-                                id: userDoc.id,
-                                data: profileDoc.data()
-                            });
-                        } else {
-                            console.log('ProfileData document not found, checking user doc data');
-                            // If ProfileData doesn't exist, check if user doc itself has the data
-                            const userData = userDoc.data();
-                            if (userData && Object.keys(userData).length > 0) {
-                                results.push({
-                                    id: userDoc.id,
-                                    data: userData
-                                });
-                            }
-                        }
-                    } else {
-                        console.log('User document not found');
+                    // Check if there's profile data
+                    if (userData.Profile && userData.Profile.ProfileData) {
+                        results.push({
+                            id: searchTerm,
+                            data: userData.Profile.ProfileData
+                        });
+                    } else if (userData.userName || userData.walletAddress) {
+                        // User data might be directly in the user object
+                        results.push({
+                            id: searchTerm,
+                            data: userData
+                        });
                     }
-                } catch (e) {
-                    console.log('Direct ID search failed:', e);
                 }
 
-                // If no results by exact ID, search through all users
+                // If no direct match, search through all users
                 if (results.length === 0) {
-                    console.log('No direct match found, searching all users...');
+                    console.log('No direct match, searching all users...');
                     resultsDiv.innerHTML = '<div class="loading">Searching through all users... This may take a moment.</div>';
                     
-                    const usersSnapshot = await db.collection('users').limit(100).get(); // Limit to prevent timeout
-                    console.log('Found', usersSnapshot.docs.length, 'user documents');
+                    const usersSnapshot = await database.ref('users').once('value');
+                    const allUsers = usersSnapshot.val();
                     
-                    let searchedCount = 0;
-                    for (const userDoc of usersSnapshot.docs) {
-                        try {
+                    if (allUsers) {
+                        console.log('Total users in database:', Object.keys(allUsers).length);
+                        
+                        let searchedCount = 0;
+                        const searchLower = searchTerm.toLowerCase();
+                        
+                        for (const [userId, userData] of Object.entries(allUsers)) {
                             searchedCount++;
                             
-                            // First check the main user document
-                            let data = userDoc.data();
-                            let foundInMain = false;
-                            
-                            if (data && checkDataMatch(data, searchTerm)) {
-                                results.push({
-                                    id: userDoc.id,
-                                    data: data,
-                                    source: 'main_doc'
-                                });
-                                foundInMain = true;
-                            }
-                            
-                            // Then check the Profile subcollection
-                            if (!foundInMain) {
-                                const profileDoc = await userDoc.ref.collection('Profile').doc('ProfileData').get();
+                            try {
+                                let profileData = null;
                                 
-                                if (profileDoc.exists) {
-                                    data = profileDoc.data();
+                                // Check Profile/ProfileData structure
+                                if (userData.Profile && userData.Profile.ProfileData) {
+                                    profileData = userData.Profile.ProfileData;
+                                } else if (userData.userName || userData.walletAddress) {
+                                    // Data might be directly in user object
+                                    profileData = userData;
+                                }
+                                
+                                if (profileData) {
+                                    // Search through profile fields
+                                    const fieldsToSearch = [
+                                        'userName', 'userid', 'eSkillzWalletAddress', 'eSkillzKey',
+                                        'email', 'displayName', 'walletAddress', 'address'
+                                    ];
                                     
-                                    if (checkDataMatch(data, searchTerm)) {
+                                    let matchFound = false;
+                                    
+                                    // Check if userId matches
+                                    if (userId.toLowerCase().includes(searchLower)) {
+                                        matchFound = true;
+                                    }
+                                    
+                                    // Check profile fields
+                                    for (const field of fieldsToSearch) {
+                                        if (profileData[field] && 
+                                            profileData[field].toString().toLowerCase().includes(searchLower)) {
+                                            matchFound = true;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (matchFound) {
+                                        console.log('Match found:', userId, profileData.userName);
                                         results.push({
-                                            id: userDoc.id,
-                                            data: data,
-                                            source: 'profile_doc'
+                                            id: userId,
+                                            data: profileData
                                         });
                                     }
                                 }
+                            } catch (e) {
+                                console.log('Error processing user:', userId, e);
                             }
                             
-                            // Update progress every 10 searches
-                            if (searchedCount % 10 === 0) {
+                            // Update progress every 100 users
+                            if (searchedCount % 100 === 0) {
                                 resultsDiv.innerHTML = `<div class="loading">Searched ${searchedCount} users... Found ${results.length} matches so far.</div>`;
                             }
-                            
-                        } catch (e) {
-                            console.log('Error searching user:', userDoc.id, e);
                         }
+                        
+                        console.log(`Search completed. Checked ${searchedCount} users, found ${results.length} matches.`);
+                    } else {
+                        console.log('No users found in database');
                     }
-                    
-                    console.log('Search completed. Found', results.length, 'results');
                 }
 
                 displayResults(results, searchTerm);
@@ -332,43 +252,16 @@
             } catch (error) {
                 console.error('Search error:', error);
                 resultsDiv.innerHTML = `<div class="error">Search failed: ${error.message}<br><br>
-                    <div class="debug-info">
-                        Error details: ${error.code ? error.code : 'Unknown error'}<br>
-                        Make sure you're connected to the internet and Firebase is properly configured.
-                    </div>
+                    Make sure you're connected to the internet and Firebase is properly configured.
                 </div>`;
             }
-        }
-
-        function checkDataMatch(data, searchTerm) {
-            const searchLower = searchTerm.toLowerCase();
-            
-            // List of fields to search through
-            const fieldsToSearch = [
-                'userName', 'userid', 'eSkillzWalletAddress', 'eSkillzKey', 
-                'email', 'displayName', 'walletAddress', 'address'
-            ];
-            
-            for (const field of fieldsToSearch) {
-                if (data[field] && data[field].toString().toLowerCase().includes(searchLower)) {
-                    return true;
-                }
-            }
-            
-            return false;
         }
 
         function displayResults(results, searchTerm) {
             const resultsDiv = document.getElementById('results');
             
             if (results.length === 0) {
-                resultsDiv.innerHTML = `
-                    <div class="no-results">
-                        No users found matching "${searchTerm}".
-                        <div class="debug-info">
-                            Search was performed on fields: userName, userid, eSkillzWalletAddress, eSkillzKey, email, displayName, walletAddress, address
-                        </div>
-                    </div>`;
+                resultsDiv.innerHTML = `<div class="no-results">No users found matching "${searchTerm}".</div>`;
                 return;
             }
 
@@ -378,7 +271,7 @@
                 const data = result.data;
                 html += `
                     <div class="result">
-                        <div class="user-id">User ID: ${result.id} ${result.source ? `(from ${result.source})` : ''}</div>
+                        <div class="user-id">User ID: ${result.id}</div>
                         <div class="user-details">
                             <div class="field"><span class="field-name">Username:</span> ${data.userName || data.displayName || 'N/A'}</div>
                             <div class="field"><span class="field-name">User ID (from data):</span> ${data.userid || 'N/A'}</div>
@@ -391,9 +284,9 @@
                             <div class="field"><span class="field-name">Losses:</span> ${data.lost || 'N/A'}</div>
                             <div class="field"><span class="field-name">Wallet Address:</span> ${data.eSkillzWalletAddress || data.walletAddress || data.address || 'N/A'}</div>
                             <div class="field"><span class="field-name">eSkillz Key:</span> ${data.eSkillzKey || 'N/A'}</div>
-                            <div class="field"><span class="field-name">Last Played:</span> ${data.LastPlayed ? (data.LastPlayed.seconds ? new Date(data.LastPlayed.seconds * 1000).toLocaleString() : data.LastPlayed) : 'N/A'}</div>
+                            <div class="field"><span class="field-name">Last Played:</span> ${data.LastPlayed || 'N/A'}</div>
                             <div class="field"><span class="field-name">Birth Day:</span> ${data.birthDay || 'N/A'}</div>
-                            <div class="field"><span class="field-name">Created:</span> ${data.createTime ? (data.createTime.seconds ? new Date(data.createTime.seconds * 1000).toLocaleString() : data.createTime) : 'N/A'}</div>
+                            <div class="field"><span class="field-name">Created:</span> ${data.createTime || 'N/A'}</div>
                         </div>
                     </div>
                 `;
@@ -411,91 +304,58 @@
 
         // Test Firebase connection on page load
         window.addEventListener('load', function() {
-            document.getElementById('results').innerHTML = '<div class="loading">Testing Firebase connection...</div>';
+            document.getElementById('results').innerHTML = '<div class="loading">Testing Realtime Database connection...</div>';
             
             setTimeout(async function() {
                 try {
-                    console.log('=== FIREBASE DEBUG INFO ===');
-                    console.log('Connected to project:', firebaseConfig.projectId);
-                    console.log('Full config:', firebaseConfig);
+                    // Test connection by reading users count
+                    const usersSnapshot = await database.ref('users').once('value');
+                    const allUsers = usersSnapshot.val();
                     
-                    // Get total count of users
-                    const totalUsersSnapshot = await db.collection('users').get();
-                    const totalUsers = totalUsersSnapshot.docs.length;
-                    console.log('TOTAL USERS IN DATABASE:', totalUsers);
-                    
-                    if (totalUsers <= 5) {
-                        document.getElementById('results').innerHTML = `
-                            <div class="error">
-                                <strong>PROBLEM FOUND:</strong> Only ${totalUsers} users found in database!<br><br>
-                                Project: <strong>${firebaseConfig.projectId}</strong><br><br>
-                                This suggests we're connected to the WRONG Firebase project.<br>
-                                <strong>Click the red "Try Dev Project" button below to switch.</strong>
-                            </div>`;
-                        return;
-                    }
-                    
-                    // If we have many users, get a sample with profiles
-                    let sampleUsersWithProfiles = [];
-                    let checkedCount = 0;
-                    
-                    for (const userDoc of totalUsersSnapshot.docs.slice(0, 20)) { // Check first 20
-                        checkedCount++;
-                        try {
-                            const profileDoc = await userDoc.ref.collection('Profile').doc('ProfileData').get();
-                            if (profileDoc.exists) {
-                                const profileData = profileDoc.data();
-                                sampleUsersWithProfiles.push({
-                                    id: userDoc.id,
-                                    userName: profileData.userName || 'N/A',
-                                    userid: profileData.userid || 'N/A'
-                                });
-                                console.log('✓ User with profile found:', userDoc.id, '- userName:', profileData.userName);
-                                
-                                if (sampleUsersWithProfiles.length >= 5) break; // Get 5 samples
+                    if (allUsers) {
+                        const totalUsers = Object.keys(allUsers).length;
+                        console.log('Realtime Database - Total users found:', totalUsers);
+                        
+                        // Get a few sample users with profiles
+                        let sampleUsers = [];
+                        let checkedCount = 0;
+                        
+                        for (const [userId, userData] of Object.entries(allUsers)) {
+                            if (checkedCount >= 5) break;
+                            
+                            let profileData = null;
+                            if (userData.Profile && userData.Profile.ProfileData) {
+                                profileData = userData.Profile.ProfileData;
+                            } else if (userData.userName) {
+                                profileData = userData;
                             }
-                        } catch (e) {
-                            console.log('Error checking profile for', userDoc.id, ':', e);
+                            
+                            if (profileData && profileData.userName) {
+                                sampleUsers.push({
+                                    id: userId,
+                                    userName: profileData.userName
+                                });
+                                checkedCount++;
+                            }
                         }
-                    }
-                    
-                    let message = `
-                        <strong>SUCCESS!</strong> Connected to correct project: <strong>${firebaseConfig.projectId}</strong><br>
-                        Total users in database: <strong>${totalUsers}</strong><br>
-                        Users with profiles found: <strong>${sampleUsersWithProfiles.length}</strong> out of ${checkedCount} checked
-                    `;
-                    
-                    if (sampleUsersWithProfiles.length > 0) {
-                        message += '<br><br><strong>Sample users you can search for:</strong><br>';
-                        sampleUsersWithProfiles.forEach(user => {
-                            message += `• ID: <code>${user.id}</code> (userName: "${user.userName}")<br>`;
+                        
+                        let message = `
+                            <strong>🎉 SUCCESS!</strong> Connected to Realtime Database!<br>
+                            Total users found: <strong>${totalUsers}</strong><br><br>
+                            <strong>Sample users you can search for:</strong><br>
+                        `;
+                        
+                        sampleUsers.forEach(user => {
+                            message += `• User ID: <code>${user.id}</code> (userName: "${user.userName}")<br>`;
                         });
+                        
+                        document.getElementById('results').innerHTML = `<div class="success">${message}</div>`;
+                    } else {
+                        document.getElementById('results').innerHTML = '<div class="error">No users found in Realtime Database</div>';
                     }
-                    
-                    document.getElementById('results').innerHTML = `<div class="success">${message}</div>`;
                 } catch (error) {
-                    console.error('Firebase connection test failed:', error);
-                    document.getElementById('results').innerHTML = `
-                        <div class="error">
-                            Firebase connection test failed: ${error.message}<br><br>
-                            Project ID: ${firebaseConfig.projectId}<br>
-                            <strong>Try the red "Try Dev Project" button below.</strong>
-                        </div>`;
-                }
-            }, 2000);
-        });
-
-        // Test Firebase connection on page load
-        window.addEventListener('load', function() {
-            setTimeout(async function() {
-                try {
-                    // Try to read from Firestore to test connection
-                    const testDoc = await db.collection('users').limit(1).get();
-                    console.log('Firebase connection test successful');
-                    document.getElementById('results').innerHTML = '<div class="success">Firebase connected and ready! You can now search for users.</div>';
-                } catch (error) {
-                    console.error('Firebase connection test failed:', error);
-                    document.getElementById('results').innerHTML = `<div class="error">Firebase connection test failed: ${error.message}</div>`;
+                    console.error('Realtime Database connection test failed:', error);
+                    document.getElementById('results').innerHTML = `<div class="error">Connection test failed: ${error.message}</div>`;
                 }
             }, 2000);
         });
